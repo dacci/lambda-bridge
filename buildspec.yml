@@ -1,0 +1,25 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      - 'ACCOUNT_ID="$(echo "${CODEBUILD_BUILD_ARN}" | cut -d: -f5)"'
+      - REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      - aws ecr get-login-password | docker login --username AWS --password-stdin "${REGISTRY}"
+      - |
+        if [ -n "${DOCKER_USERNAME}" -a -n "${DOCKER_PASSWORD}" ]; then
+          echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
+        fi
+  build:
+    commands:
+      - docker build -t "${IMAGE_NAME}" .
+  post_build:
+    commands:
+      - |
+        if [ "${CODEBUILD_BUILD_SUCCEEDING}" = 1 ]; then
+          docker tag "${IMAGE_NAME}" "${REGISTRY}/${IMAGE_NAME}"
+          docker push "${REGISTRY}/${IMAGE_NAME}"
+        fi
